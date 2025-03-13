@@ -18,8 +18,9 @@ export default function Stack({ stack }: StackContext) {
     const lambdaFunction = new Function(stack, "LambdaFunction", {
         handler: "src/lambda.handler",
         environment: {
-            DB_HOST: db.clusterEndpoint.hostname,
-            DB_PORT: db.clusterEndpoint.port.toString(),
+            DB_ARN: db.clusterArn, // Add the ARN of the database cluster
+            DB_SECRET_ARN: db.secret?.secretArn || "", // Add the ARN of the secret
+            DB_NAME: "mydb",
         },
     });
 
