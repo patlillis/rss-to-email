@@ -2,6 +2,7 @@ import { StackContext, Function, Cron } from "sst/constructs";
 import * as rds from 'aws-cdk-lib/aws-rds';
 import { RemovalPolicy } from "aws-cdk-lib";
 import * as ec2 from "aws-cdk-lib/aws-ec2";
+import * as knex from 'knex';
 
 export default function Stack({ stack }: StackContext) {
     const vpc = new ec2.Vpc(stack, 'VPC');
@@ -26,6 +27,25 @@ export default function Stack({ stack }: StackContext) {
 
     // Grant the Lambda function permissions to access the database
     db.grantDataApiAccess(lambdaFunction);
+
+    // Run migrations
+    const migrate = async () => {
+        const knexInstance = knex({
+            client: 'pg',
+            connection: {
+                host: db.clusterEndpoint.hostname,
+                port: db.clusterEndpoint.port,
+                database: "mydb",
+                user: "admin",
+                password: db.secret?.secretValueFromJson("password") || "",
+            },
+        });
+
+        await knexInstance.migrate.latest();
+        await knexInstance.destroy();
+    };
+
+    migrate().catch(console.error);
 
     // Create a cron job to run the Lambda function once a day at midnight
     // new Cron(stack, "DailyCron", {
