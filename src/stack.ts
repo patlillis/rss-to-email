@@ -1,18 +1,17 @@
-import { Api, StackContext, Function, Cron } from "sst/constructs";
-import { DatabaseCluster, DatabaseClusterEngine, Credentials } from "aws-cdk-lib/aws-rds";
-import { handler } from "./lambda";
+import { StackContext, Function, Cron } from "sst/constructs";
+import * as rds from 'aws-cdk-lib/aws-rds';
 import { RemovalPolicy } from "aws-cdk-lib";
+import * as ec2 from "aws-cdk-lib/aws-ec2";
 
 export default function Stack({ stack }: StackContext) {
+    const vpc = new ec2.Vpc(stack, 'VPC');
+
     // Create an Aurora Serverless v2 instance
-    const db = new DatabaseCluster(stack, "Database", {
-        engine: DatabaseClusterEngine.auroraPostgres({
-            version: "2.0.0", // Specify the version for Aurora Serverless v2
-        }),
-        credentials: Credentials.fromGeneratedSecret("admin"),
-        defaultDatabaseName: "mydb",
-        removalPolicy: RemovalPolicy.DESTROY, // Change to RETAIN for production
-        serverlessCluster: true,
+    const db = new rds.DatabaseCluster(stack, 'Cluster', {
+        engine: rds.DatabaseClusterEngine.auroraPostgres({ version: rds.AuroraPostgresEngineVersion.VER_17_2 }),
+        removalPolicy: RemovalPolicy.RETAIN,
+        iamAuthentication: true,
+        vpc,
     });
 
     // Create a Lambda function with permissions to access the RDS instance
@@ -20,10 +19,7 @@ export default function Stack({ stack }: StackContext) {
         handler: "src/lambda.handler",
         environment: {
             DB_HOST: db.clusterEndpoint.hostname,
-            DB_PORT: db.clusterEndpoint.port,
-            DB_NAME: "mydb",
-            DB_USER: "admin",
-            DB_PASSWORD: db.secret?.secretValueFromJson("password") || "",
+            DB_PORT: db.clusterEndpoint.port.toString(),
         },
     });
 
@@ -31,18 +27,8 @@ export default function Stack({ stack }: StackContext) {
     db.grantDataApiAccess(lambdaFunction);
 
     // Create a cron job to run the Lambda function once a day at midnight
-    new Cron(stack, "DailyCron", {
-        schedule: "rate(1 day)",
-        job: lambdaFunction,
-    });
-
-    const api = new Api(stack, "Api", {
-        routes: {
-            "GET /": handler,
-        },
-    });
-    stack.addOutputs({
-        ApiEndpoint: api.url,
-        DatabaseEndpoint: db.clusterEndpoint.hostname,
-    });
+    // new Cron(stack, "DailyCron", {
+    //     schedule: "rate(1 day)",
+    //     job: lambdaFunction,
+    // });
 }
