@@ -11,19 +11,8 @@ export const handler = async (event) => {
     };
 
     try {
-        const result = await rdsData.executeStatement(params).promise();
-        return {
-            body: JSON.stringify({
-                message: "Query executed successfully!",
-                data: result,
-            }),
-        };
+        await rdsData.executeStatement(params).promise();
     } catch (error) {
-        return {
-            body: JSON.stringify({
-                message: "Error executing query",
-                error: error.message,
-            }),
-        };
+        console.error("Error executing query", error.message);
     }
 };
