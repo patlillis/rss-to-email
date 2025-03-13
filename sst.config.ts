@@ -1,5 +1,5 @@
 import { SSTConfig } from "sst";
-import { Api } from "sst/constructs";
+import Stack from "./src/stack";
 
 export default {
     config() {
@@ -9,15 +9,6 @@ export default {
         };
     },
     stacks(app) {
-        app.stack(function Stack() {
-            const api = new Api(this, "Api", {
-                routes: {
-                    "GET /": "functions/lambda.handler",
-                },
-            });
-            this.addOutputs({
-                ApiEndpoint: api.url,
-            });
-        });
+        app.stack(Stack);
     },
 } satisfies SSTConfig;
