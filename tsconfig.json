@@ -4,6 +4,7 @@
         "module": "ESNext",
         "moduleResolution": "bundler",
         "strict": true,
-        "esModuleInterop": true
+        "esModuleInterop": true,
+        "useUnknownInCatchVariables": false // Add this line
     }
 }
