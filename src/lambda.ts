@@ -13,7 +13,6 @@ export const handler = async (event) => {
     try {
         const result = await rdsData.executeStatement(params).promise();
         return {
-            statusCode: 200,
             body: JSON.stringify({
                 message: "Query executed successfully!",
                 data: result,
@@ -21,7 +20,6 @@ export const handler = async (event) => {
         };
     } catch (error) {
         return {
-            statusCode: 500,
             body: JSON.stringify({
                 message: "Error executing query",
                 error: error.message,
