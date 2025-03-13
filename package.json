@@ -1,0 +1,12 @@
+{
+  "name": "rss-to-email",
+  "private": "true",
+  "version": "0.0.1",
+  "author": "Pat Lillis <lillispm@gmail.com>",
+  "license": "MIT",
+  "type": "module",
+  "devDependencies": {
+    "sst": "^2.47.3",
+    "typescript": "^5.8.2"
+  }
+}

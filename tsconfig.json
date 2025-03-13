@@ -5,6 +5,6 @@
         "moduleResolution": "bundler",
         "strict": true,
         "esModuleInterop": true,
-        "useUnknownInCatchVariables": false // Add this line
+        "useUnknownInCatchVariables": false
     }
 }
