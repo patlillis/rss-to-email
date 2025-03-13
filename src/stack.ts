@@ -1,12 +1,18 @@
-import { Api, StackContext, RDS, Function, Cron } from "sst/constructs";
+import { Api, StackContext, Function, Cron } from "sst/constructs";
+import { DatabaseCluster, DatabaseClusterEngine, Credentials } from "aws-cdk-lib/aws-rds";
 import { handler } from "./lambda";
+import { RemovalPolicy } from "aws-cdk-lib";
 
 export default function Stack({ stack }: StackContext) {
-    // Create an RDS Aurora v2 instance
-    const db = new RDS(stack, "Database", {
-        engine: "aurora-postgresql",
+    // Create an Aurora Serverless v2 instance
+    const db = new DatabaseCluster(stack, "Database", {
+        engine: DatabaseClusterEngine.auroraPostgres({
+            version: "2.0.0", // Specify the version for Aurora Serverless v2
+        }),
+        credentials: Credentials.fromGeneratedSecret("admin"),
         defaultDatabaseName: "mydb",
-        migrations: "src/migrations",
+        removalPolicy: RemovalPolicy.DESTROY, // Change to RETAIN for production
+        serverlessCluster: true,
     });
 
     // Create a Lambda function with permissions to access the RDS instance
