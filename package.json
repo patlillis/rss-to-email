@@ -1,12 +1,16 @@
 {
-  "name": "rss-to-email",
-  "private": "true",
-  "version": "0.0.1",
-  "author": "Pat Lillis <lillispm@gmail.com>",
-  "license": "MIT",
-  "type": "module",
+  "name": "example-worker",
+  "version": "1.0.0",
+  "description": "Example Cloudflare Worker with cron triggers",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@cloudflare/workers-types": "^4.20240208.0"
+  },
   "devDependencies": {
-    "sst": "^2.47.3",
-    "typescript": "^5.8.2"
+    "wrangler": "^3.32.0"
   }
 }
