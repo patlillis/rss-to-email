@@ -10,7 +10,6 @@
     "check": "tsc"
   },
   "dependencies": {
-    "dayjs": "^1.11.10",
     "rss-parser": "^3.13.0"
   },
   "devDependencies": {

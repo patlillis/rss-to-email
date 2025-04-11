@@ -1,6 +1,5 @@
 import Parser from 'rss-parser';
 import { ExecutionContext, KVNamespace, ScheduledEvent } from '@cloudflare/workers-types';
-import dayjs from 'dayjs';
 
 import { feeds } from './feeds';
 
@@ -97,12 +96,11 @@ async function checkRSSFeeds(env: Env): Promise<void> {
         // If this is a new entry we haven't seen before and it was published after our last check
         if (!lastCheckData.seenEntries[entryId] && pubDate > lastCheckData.lastCheck) {
           const pubDateObj = item.pubDate ? new Date(item.pubDate) : new Date();
-          const dayjsDate = dayjs(pubDateObj);
           
           newEntries.push({
             title: item.title ?? 'Untitled',
             link: item.link ?? '#',
-            date: dayjsDate.format('MMM D, YYYY'),  // Format as "Apr 10, 2025"
+            date: formatDate(pubDateObj),
             pubDate: pubDateObj,
             feedTitle: feed.title || 'Unknown Blog'
           });
@@ -132,6 +130,16 @@ async function checkRSSFeeds(env: Env): Promise<void> {
   } else {
     console.log('No new blog entries found');
   }
+}
+
+// Helper function to format dates in a readable format
+function formatDate(date: Date): string {
+  const options: Intl.DateTimeFormatOptions = { 
+    year: 'numeric', 
+    month: 'short', 
+    day: 'numeric' 
+  };
+  return date.toLocaleDateString('en-US', options);
 }
 
 async function sendEmail(env: Env, entries: BlogEntry[]): Promise<void> {
