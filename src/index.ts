@@ -1,4 +1,6 @@
 import Parser from 'rss-parser';
+import { ExecutionContext, KVNamespace, ScheduledEvent } from '@cloudflare/workers-types'
+
 import { feeds } from './feeds';
 
 // Define types for our data structures
@@ -21,7 +23,6 @@ type Env = {
   EMAIL_SUBJECT: string;
 };
 
-// Store the last check time and previously seen entries
 const STORAGE_KEY = 'last_check_data';
 
 export default {
