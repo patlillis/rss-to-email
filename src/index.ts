@@ -1,5 +1,10 @@
 import Parser from 'rss-parser';
 import { ExecutionContext, KVNamespace, ScheduledEvent } from '@cloudflare/workers-types';
+import { 
+  SESClient, 
+  SendEmailCommand,
+  SendEmailCommandInput 
+} from '@aws-sdk/client-ses';
 
 import { feeds } from './feeds';
 
@@ -21,6 +26,9 @@ type Env = {
   EMAIL_TO: string;
   EMAIL_FROM: string;
   EMAIL_SUBJECT: string;
+  AWS_REGION: string;
+  AWS_ACCESS_KEY_ID: string;
+  AWS_SECRET_ACCESS_KEY: string;
 };
 
 const STORAGE_KEY = 'last_check_data';
@@ -164,43 +172,42 @@ async function sendEmail(env: Env, entries: BlogEntry[]): Promise<void> {
 </ul>
 <p>Enjoy your reading!</p>`;
 
-  // Use Cloudflare Email Workers to send the email
   try {
-    const emailTo = env.EMAIL_TO;
-    const emailFrom = env.EMAIL_FROM;
-    const emailSubject = env.EMAIL_SUBJECT;
-
-    // Send email using Cloudflare Email Workers
-    const response = await fetch('https://api.mailchannels.net/tx/v1/send', {
-      method: 'POST',
-      headers: {
-        'content-type': 'application/json',
+    // Create SES client
+    const sesClient = new SESClient({
+      region: env.AWS_REGION,
+      credentials: {
+        accessKeyId: env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
       },
-      body: JSON.stringify({
-        personalizations: [
-          {
-            to: [{ email: emailTo }],
-          },
-        ],
-        from: {
-          email: emailFrom,
-        },
-        subject: emailSubject,
-        content: [
-          {
-            type: 'text/html',
-            value: emailBody,
-          },
-        ],
-      }),
     });
 
-    if (response.status === 202) {
-      console.log('Email sent successfully');
-    } else {
-      console.error('Failed to send email:', await response.text());
-    }
+    // Create the email parameters
+    const params: SendEmailCommandInput = {
+      Source: env.EMAIL_FROM,
+      Destination: {
+        ToAddresses: [env.EMAIL_TO],
+      },
+      Message: {
+        Subject: {
+          Data: env.EMAIL_SUBJECT,
+          Charset: 'UTF-8',
+        },
+        Body: {
+          Html: {
+            Data: emailBody,
+            Charset: 'UTF-8',
+          },
+        },
+      },
+    };
+
+    // Send the email
+    const command = new SendEmailCommand(params);
+    const response = await sesClient.send(command);
+    
+    console.log('Email sent successfully:', response.MessageId);
   } catch (error) {
-    console.error('Error sending email:', error);
+    console.error('Error sending email with AWS SES:', error);
   }
 }

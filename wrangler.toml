@@ -9,6 +9,12 @@ ENVIRONMENT = "production"
 EMAIL_TO = "your-email@example.com"
 EMAIL_FROM = "rss-updates@your-domain.com"
 EMAIL_SUBJECT = "Daily Blog Updates"
+# AWS SES configuration
+AWS_REGION = "us-east-1"
+
+# These should be set as secrets in production
+# AWS_ACCESS_KEY_ID = "your-access-key"
+# AWS_SECRET_ACCESS_KEY = "your-secret-key"
 
 [observability]
 enabled = true
