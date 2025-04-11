@@ -1,9 +1,9 @@
 import Parser from 'rss-parser';
 import { ExecutionContext, KVNamespace, ScheduledEvent } from '@cloudflare/workers-types';
-import { 
-  SESClient, 
+import {
+  SESClient,
   SendEmailCommand,
-  SendEmailCommandInput 
+  SendEmailCommandInput
 } from '@aws-sdk/client-ses';
 
 import { feeds } from './feeds';
@@ -22,11 +22,8 @@ type BlogEntry = {
 };
 
 type Env = {
-  BLOG_KV: KVNamespace;
-  EMAIL_TO: string;
-  EMAIL_FROM: string;
-  EMAIL_SUBJECT: string;
-  AWS_REGION: string;
+  RSS_TO_EMAIL: KVNamespace;
+  EMAIL_ADDRESS: string;
   AWS_ACCESS_KEY_ID: string;
   AWS_SECRET_ACCESS_KEY: string;
 };
@@ -79,7 +76,7 @@ async function checkRSSFeeds(env: Env): Promise<void> {
   // Get the last check data from KV or create default
   let lastCheckData: LastCheckData;
   try {
-    const storedData = await env.BLOG_KV.get(STORAGE_KEY, { type: 'json' });
+    const storedData = await env.RSS_TO_EMAIL.get(STORAGE_KEY, { type: 'json' });
     lastCheckData = storedData as LastCheckData || { lastCheck: 0, seenEntries: {} };
   } catch (error) {
     console.error('Error retrieving last check data:', error);
@@ -125,7 +122,7 @@ async function checkRSSFeeds(env: Env): Promise<void> {
 
   // Save the updated check data
   try {
-    await env.BLOG_KV.put(STORAGE_KEY, JSON.stringify(lastCheckData));
+    await env.RSS_TO_EMAIL.put(STORAGE_KEY, JSON.stringify(lastCheckData));
   } catch (error) {
     console.error('Error saving check data:', error);
   }
@@ -175,7 +172,6 @@ async function sendEmail(env: Env, entries: BlogEntry[]): Promise<void> {
   try {
     // Create SES client
     const sesClient = new SESClient({
-      region: env.AWS_REGION,
       credentials: {
         accessKeyId: env.AWS_ACCESS_KEY_ID,
         secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
@@ -184,13 +180,13 @@ async function sendEmail(env: Env, entries: BlogEntry[]): Promise<void> {
 
     // Create the email parameters
     const params: SendEmailCommandInput = {
-      Source: env.EMAIL_FROM,
+      Source: env.EMAIL_ADDRESS,
       Destination: {
-        ToAddresses: [env.EMAIL_TO],
+        ToAddresses: [env.EMAIL_ADDRESS],
       },
       Message: {
         Subject: {
-          Data: env.EMAIL_SUBJECT,
+          Data: 'Daily Blog Updates',
           Charset: 'UTF-8',
         },
         Body: {
@@ -205,7 +201,7 @@ async function sendEmail(env: Env, entries: BlogEntry[]): Promise<void> {
     // Send the email
     const command = new SendEmailCommand(params);
     const response = await sesClient.send(command);
-    
+
     console.log('Email sent successfully:', response.MessageId);
   } catch (error) {
     console.error('Error sending email with AWS SES:', error);

@@ -4,20 +4,11 @@ compatibility_date = "2024-01-01"
 triggers = { crons = ["0 8 * * *"] } # Run once a day at 8:00 AM UTC
 
 [vars]
-ENVIRONMENT = "production"
-# Email configuration
-EMAIL_TO = "your-email@example.com"
-EMAIL_FROM = "rss-updates@your-domain.com"
-EMAIL_SUBJECT = "Daily Blog Updates"
-# AWS SES configuration
-AWS_REGION = "us-east-1"
-
-# These should be set as secrets in production
-# AWS_ACCESS_KEY_ID = "your-access-key"
-# AWS_SECRET_ACCESS_KEY = "your-secret-key"
+EMAIL_ADDRESS = "lillispm@gmail.com"
 
 [observability]
 enabled = true
 
 [[kv_namespaces]]
-binding = "BLOG_KV"
+binding = "RSS_TO_EMAIL"
+id = "5c983f4a1baf4aa6b1ebe0319b1d61e2"

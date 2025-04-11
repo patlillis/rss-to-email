@@ -1,7 +1,7 @@
 {
-  "name": "example-worker",
+  "name": "rss-to-email",
   "version": "1.0.0",
-  "description": "Example Cloudflare Worker with cron triggers",
+  "description": "Send daily RSS feed updates via email",
   "main": "src/index.ts",
   "scripts": {
     "dev": "wrangler dev",
@@ -10,7 +10,7 @@
     "check": "tsc"
   },
   "dependencies": {
-    "@aws-sdk/client-ses": "^3.525.0",
+    "@aws-sdk/client-ses": "^3.787.0",
     "rss-parser": "^3.13.0"
   },
   "devDependencies": {
