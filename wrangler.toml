@@ -2,11 +2,17 @@ name = "example-worker"
 main = "src/index.js"
 compatibility_date = "2024-01-01"
 
-# Run every 5 minutes
-triggers = { crons = ["*/5 * * * *"] }
+# Run once a day at 8:00 AM UTC
+triggers = { crons = ["0 8 * * *"] }
 
 [vars]
 ENVIRONMENT = "production"
+# Comma-separated list of RSS feed URLs
+RSS_FEEDS = "https://example.com/feed.xml,https://another-blog.com/rss"
+# Email configuration
+EMAIL_TO = "your-email@example.com"
+EMAIL_FROM = "rss-updates@your-domain.com"
+EMAIL_SUBJECT = "Daily Blog Updates"
 
 [observability]
 enabled = true
