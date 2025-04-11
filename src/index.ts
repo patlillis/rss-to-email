@@ -12,8 +12,8 @@ type LastCheckData = {
 type BlogEntry = {
   title: string;
   link: string;
-  date: string;
   feedTitle: string;
+  date: Date;
 };
 
 type Env = {
@@ -89,15 +89,15 @@ async function checkRSSFeeds(env: Env): Promise<void> {
 
       // Check for new entries since last check
       for (const item of feed.items) {
-        const entryId = item.guid || item.link || item.title || '';
+        const entryId = item.guid ?? item.link ?? item.title ?? '';
         const pubDate = item.pubDate ? new Date(item.pubDate).getTime() : now;
 
         // If this is a new entry we haven't seen before and it was published after our last check
         if (!lastCheckData.seenEntries[entryId] && pubDate > lastCheckData.lastCheck) {
           newEntries.push({
-            title: item.title || 'Untitled',
-            link: item.link || '#',
-            date: item.pubDate || new Date().toISOString(),
+            title: item.title ?? 'Untitled',
+            link: item.link ?? '#',
+            date: item.pubDate ?? new Date().toISOString(),
             feedTitle: feed.title || 'Unknown Blog'
           });
 
