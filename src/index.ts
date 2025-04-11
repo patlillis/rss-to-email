@@ -90,7 +90,8 @@ async function checkRSSFeeds(env: Env): Promise<void> {
   for (const feedUrl of feedUrls) {
     try {
       console.log(`Checking feed: ${feedUrl}`);
-      const feed = await parser.parseURL(feedUrl);
+      const feedContents = await (await fetch(feedUrl)).text()
+      const feed = await parser.parseString(feedContents);
 
       // Check for new entries since last check
       for (const item of feed.items) {
