@@ -13,7 +13,6 @@ type BlogEntry = {
   title: string;
   link: string;
   feedTitle: string;
-  date: string;
   pubDate: Date;
 };
 
@@ -79,7 +78,7 @@ async function checkRSSFeeds(env: Env): Promise<void> {
     lastCheckData = { lastCheck: 0, seenEntries: {} };
   }
 
-  const now = Date.now();
+  const now = new Date();
   const newEntries: BlogEntry[] = [];
 
   // Process each feed
@@ -91,22 +90,21 @@ async function checkRSSFeeds(env: Env): Promise<void> {
       // Check for new entries since last check
       for (const item of feed.items) {
         const entryId = item.guid ?? item.link ?? item.title ?? '';
-        const pubDate = item.pubDate ? new Date(item.pubDate).getTime() : now;
+        const pubDate = item.pubDate != null ? new Date(item.pubDate) : now;
 
         // If this is a new entry we haven't seen before and it was published after our last check
-        if (!lastCheckData.seenEntries[entryId] && pubDate > lastCheckData.lastCheck) {
-          const pubDateObj = item.pubDate ? new Date(item.pubDate) : new Date();
-          
+        if (lastCheckData.seenEntries[entryId] == null && pubDate > new Date(lastCheckData.lastCheck)) {
+          const pubDate = item.pubDate ? new Date(item.pubDate) : new Date();
+
           newEntries.push({
             title: item.title ?? 'Untitled',
             link: item.link ?? '#',
-            date: formatDate(pubDateObj),
-            pubDate: pubDateObj,
+            pubDate: pubDate,
             feedTitle: feed.title || 'Unknown Blog'
           });
 
           // Mark this entry as seen
-          lastCheckData.seenEntries[entryId] = now;
+          lastCheckData.seenEntries[entryId] = now.getTime();
         }
       }
     } catch (error) {
@@ -115,7 +113,7 @@ async function checkRSSFeeds(env: Env): Promise<void> {
   }
 
   // Update the last check time
-  lastCheckData.lastCheck = now;
+  lastCheckData.lastCheck = now.getTime();
 
   // Save the updated check data
   try {
@@ -134,10 +132,10 @@ async function checkRSSFeeds(env: Env): Promise<void> {
 
 // Helper function to format dates in a readable format
 function formatDate(date: Date): string {
-  const options: Intl.DateTimeFormatOptions = { 
-    year: 'numeric', 
-    month: 'short', 
-    day: 'numeric' 
+  const options: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
   };
   return date.toLocaleDateString('en-US', options);
 }
@@ -149,7 +147,7 @@ async function sendEmail(env: Env, entries: BlogEntry[]): Promise<void> {
 <ul>`;
 
   // Sort entries by publication date (newest first)
-  const sortedEntries = [...entries].sort((a, b) => 
+  const sortedEntries = [...entries].sort((a, b) =>
     b.pubDate.getTime() - a.pubDate.getTime()
   );
 
@@ -158,7 +156,7 @@ async function sendEmail(env: Env, entries: BlogEntry[]): Promise<void> {
   <li>
     <strong>${entry.feedTitle}</strong>: 
     <a href="${entry.link}">${entry.title}</a> 
-    <span style="color: #666; font-size: 0.9em;">(${entry.date})</span>
+    <span style="color: #666; font-size: 0.9em;">(${formatDate(entry.pubDate)})</span>
   </li>`;
   }
 
