@@ -1,6 +1,6 @@
 import Parser from 'rss-parser';
 import { ExecutionContext, KVNamespace, ScheduledEvent } from '@cloudflare/workers-types';
-import { format, parseISO } from 'date-fns';
+import dayjs from 'dayjs';
 
 import { feeds } from './feeds';
 
@@ -97,11 +97,12 @@ async function checkRSSFeeds(env: Env): Promise<void> {
         // If this is a new entry we haven't seen before and it was published after our last check
         if (!lastCheckData.seenEntries[entryId] && pubDate > lastCheckData.lastCheck) {
           const pubDateObj = item.pubDate ? new Date(item.pubDate) : new Date();
+          const dayjsDate = dayjs(pubDateObj);
           
           newEntries.push({
             title: item.title ?? 'Untitled',
             link: item.link ?? '#',
-            date: format(pubDateObj, 'PPP'),  // Format as "Apr 10, 2025"
+            date: dayjsDate.format('MMM D, YYYY'),  // Format as "Apr 10, 2025"
             pubDate: pubDateObj,
             feedTitle: feed.title || 'Unknown Blog'
           });
