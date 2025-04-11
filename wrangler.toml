@@ -14,8 +14,4 @@ EMAIL_SUBJECT = "Daily Blog Updates"
 enabled = true
 
 [[kv_namespaces]]
-binding = "RSS_FEEDS"
-id = "54b3bc8f456742e5858275e035f54b14"
-
-[[kv_namespaces]]
 binding = "BLOG_KV"

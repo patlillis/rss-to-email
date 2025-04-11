@@ -1,4 +1,5 @@
 import Parser from 'rss-parser';
+import { feeds } from './feeds';
 
 // Define types for our data structures
 type LastCheckData = {
@@ -15,7 +16,6 @@ type BlogEntry = {
 
 type Env = {
   BLOG_KV: KVNamespace;
-  RSS_FEEDS: KVNamespace;
   EMAIL_TO: string;
   EMAIL_FROM: string;
   EMAIL_SUBJECT: string;
@@ -54,14 +54,8 @@ export default {
 async function checkRSSFeeds(env: Env): Promise<void> {
   const parser = new Parser();
 
-  // Get RSS feed URLs from KV
-  const feedList = await env.RSS_FEEDS.list();
-  const feedUrls: string[] = [];
-
-  for (const key of feedList.keys) {
-    const url = await env.RSS_FEEDS.get(key.name);
-    if (url) feedUrls.push(url);
-  }
+  // Use the hardcoded feed URLs from feeds.ts
+  const feedUrls = feeds;
 
   // Get the last check data from KV or create default
   let lastCheckData: LastCheckData;
