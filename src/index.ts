@@ -1,26 +1,26 @@
 import Parser from 'rss-parser';
 
-// Define interfaces for our data structures
-interface LastCheckData {
+// Define types for our data structures
+type LastCheckData = {
   lastCheck: number;
   seenEntries: Record<string, number>;
-}
+};
 
-interface BlogEntry {
+type BlogEntry = {
   title: string;
   link: string;
   date: string;
   feedTitle: string;
-}
+};
 
-interface Env {
+type Env = {
   BLOG_KV: KVNamespace;
   RSS_FEEDS: KVNamespace;
   EMAIL_TO: string;
   EMAIL_FROM: string;
   EMAIL_SUBJECT: string;
   ENVIRONMENT: string;
-}
+};
 
 // Store the last check time and previously seen entries
 const STORAGE_KEY = 'last_check_data';
