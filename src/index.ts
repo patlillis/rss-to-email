@@ -1,5 +1,6 @@
 import Parser from 'rss-parser';
-import { ExecutionContext, KVNamespace, ScheduledEvent } from '@cloudflare/workers-types'
+import { ExecutionContext, KVNamespace, ScheduledEvent } from '@cloudflare/workers-types';
+import { format, parseISO } from 'date-fns';
 
 import { feeds } from './feeds';
 
@@ -13,7 +14,8 @@ type BlogEntry = {
   title: string;
   link: string;
   feedTitle: string;
-  date: Date;
+  date: string;
+  pubDate: Date;
 };
 
 type Env = {
@@ -94,10 +96,13 @@ async function checkRSSFeeds(env: Env): Promise<void> {
 
         // If this is a new entry we haven't seen before and it was published after our last check
         if (!lastCheckData.seenEntries[entryId] && pubDate > lastCheckData.lastCheck) {
+          const pubDateObj = item.pubDate ? new Date(item.pubDate) : new Date();
+          
           newEntries.push({
             title: item.title ?? 'Untitled',
             link: item.link ?? '#',
-            date: item.pubDate ?? new Date().toISOString(),
+            date: format(pubDateObj, 'PPP'),  // Format as "Apr 10, 2025"
+            pubDate: pubDateObj,
             feedTitle: feed.title || 'Unknown Blog'
           });
 
@@ -134,12 +139,17 @@ async function sendEmail(env: Env, entries: BlogEntry[]): Promise<void> {
 <p>Found ${entries.length} new blog post${entries.length > 1 ? 's' : ''}:</p>
 <ul>`;
 
-  for (const entry of entries) {
+  // Sort entries by publication date (newest first)
+  const sortedEntries = [...entries].sort((a, b) => 
+    b.pubDate.getTime() - a.pubDate.getTime()
+  );
+
+  for (const entry of sortedEntries) {
     emailBody += `
   <li>
     <strong>${entry.feedTitle}</strong>: 
     <a href="${entry.link}">${entry.title}</a> 
-    (${entry.date})
+    <span style="color: #666; font-size: 0.9em;">(${entry.date})</span>
   </li>`;
   }
 
