@@ -77,7 +77,7 @@ async function checkRSSFeeds(env: Env): Promise<void> {
   let lastCheckData: LastCheckData;
   try {
     const storedData = await env.RSS_TO_EMAIL.get(STORAGE_KEY, { type: 'json' });
-    lastCheckData = storedData as LastCheckData || { lastCheck: 0, seenEntries: {} };
+    lastCheckData = storedData as LastCheckData ?? { lastCheck: 0, seenEntries: {} };
   } catch (error) {
     console.error('Error retrieving last check data:', error);
     lastCheckData = { lastCheck: 0, seenEntries: {} };
@@ -105,7 +105,7 @@ async function checkRSSFeeds(env: Env): Promise<void> {
             title: item.title ?? 'Untitled',
             link: item.link ?? '#',
             pubDate: pubDate,
-            feedTitle: feed.title || 'Unknown Blog'
+            feedTitle: feed.title ?? 'Unknown Blog'
           });
 
           // Mark this entry as seen
@@ -129,6 +129,7 @@ async function checkRSSFeeds(env: Env): Promise<void> {
 
   // If we found new entries, send an email
   if (newEntries.length > 0) {
+    console.log(`Found ${newEntries.length} new entries to send`)
     await sendEmail(env, newEntries);
   } else {
     console.log('No new blog entries found');
