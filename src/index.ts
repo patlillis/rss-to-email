@@ -38,8 +38,13 @@ export default {
     // Manual trigger endpoint (protected by a simple query param for demo purposes)
     // In production, you should use proper authentication
     if (url.pathname === '/check' && url.searchParams.get('key') === 'manual-trigger-key') {
-      ctx.waitUntil(checkRSSFeeds(env));
-      return new Response('RSS check triggered manually', { status: 200 });
+      try {
+        await checkRSSFeeds(env);
+        return new Response('RSS check completed successfully', { status: 200 });
+      } catch (error) {
+        console.error('Error during RSS check:', error);
+        return new Response('Error during RSS check', { status: 500 });
+      }
     }
 
     return new Response('Hello from RSS Checker Worker!', { status: 200 });
@@ -48,7 +53,12 @@ export default {
   // Handle scheduled events
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
     console.log('Daily RSS check triggered at:', new Date(event.scheduledTime).toISOString());
-    ctx.waitUntil(checkRSSFeeds(env));
+    try {
+      await checkRSSFeeds(env);
+      console.log('RSS check completed successfully');
+    } catch (error) {
+      console.error('Error during scheduled RSS check:', error);
+    }
   }
 };
 
