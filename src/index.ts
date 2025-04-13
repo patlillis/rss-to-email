@@ -1,6 +1,7 @@
 import Parser from 'rss-parser';
 import { ExecutionContext, KVNamespace, ScheduledEvent } from '@cloudflare/workers-types';
 import {
+  ConfigurationSetDoesNotExistException,
   SESClient,
   SendEmailCommand,
   SendEmailCommandInput
@@ -34,6 +35,8 @@ export default {
   // Handle HTTP requests
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+
+    console.log("Got fetch!");
 
     // Simple status endpoint
     if (url.pathname === '/status') {
