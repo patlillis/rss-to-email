@@ -1,3 +1,3 @@
-export const feeds = [
+export const feedUrls = [
   "https://www.robinsloan.com/lab.xml",
 ];

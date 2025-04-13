@@ -1,19 +1,18 @@
 import Parser from 'rss-parser';
-import { ExecutionContext, KVNamespace, ScheduledEvent } from '@cloudflare/workers-types';
+import { KVNamespace, ScheduledEvent } from '@cloudflare/workers-types';
 import {
-  ConfigurationSetDoesNotExistException,
   SESClient,
   SendEmailCommand,
   SendEmailCommandInput
 } from '@aws-sdk/client-ses';
+import { z } from 'zod';
 
-import { feeds } from './feeds';
+import { feedUrls } from './feedUrls';
 
-// Define types for our data structures
-type LastCheckData = {
-  lastCheck: number;
-  seenEntries: Record<string, number>;
-};
+const lastCheckDataSchema = z.object({
+  lastCheckEpochMillis: z.number(),
+  seenEntryIds: z.array(z.string()),
+});
 
 type BlogEntry = {
   title: string;
@@ -33,10 +32,8 @@ const STORAGE_KEY = 'last_check_data';
 
 export default {
   // Handle HTTP requests
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+  async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-
-    console.log("Got fetch!");
 
     // Simple status endpoint
     if (url.pathname === '/status') {
@@ -59,7 +56,7 @@ export default {
   },
 
   // Handle scheduled events
-  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext): Promise<void> {
+  async scheduled(event: ScheduledEvent, env: Env): Promise<void> {
     console.log('Daily RSS check triggered at:', new Date(event.scheduledTime).toISOString());
     try {
       await checkRSSFeeds(env);
@@ -73,63 +70,45 @@ export default {
 async function checkRSSFeeds(env: Env): Promise<void> {
   const parser = new Parser();
 
-  // Use the hardcoded feed URLs from feeds.ts
-  const feedUrls = feeds;
-
-  // Get the last check data from KV or create default
-  let lastCheckData: LastCheckData;
-  try {
-    const storedData = await env.RSS_TO_EMAIL.get(STORAGE_KEY, { type: 'json' });
-    lastCheckData = storedData as LastCheckData ?? { lastCheck: 0, seenEntries: {} };
-  } catch (error) {
-    console.error('Error retrieving last check data:', error);
-    lastCheckData = { lastCheck: 0, seenEntries: {} };
-  }
+  const storedData = await env.RSS_TO_EMAIL.get(STORAGE_KEY, { type: 'json' });
+  const lastCheckData = lastCheckDataSchema.parse(storedData);
 
   const now = new Date();
   const newEntries: BlogEntry[] = [];
 
-  // Process each feed
   for (const feedUrl of feedUrls) {
-    try {
-      console.log(`Checking feed: ${feedUrl}`);
-      const feedContents = await (await fetch(feedUrl)).text()
-      const feed = await parser.parseString(feedContents);
+    console.log(`Checking feed: ${feedUrl}`);
 
-      // Check for new entries since last check
-      for (const item of feed.items) {
-        const entryId = item.guid ?? item.link ?? item.title ?? '';
-        const pubDate = item.pubDate != null ? new Date(item.pubDate) : now;
+    const fetchFeedResult = await fetch(feedUrl);
+    const feedContents = await fetchFeedResult.text();
+    const feed = await parser.parseString(feedContents);
 
-        // If this is a new entry we haven't seen before and it was published after our last check
-        if (lastCheckData.seenEntries[entryId] == null && pubDate > new Date(lastCheckData.lastCheck)) {
-          const pubDate = item.pubDate ? new Date(item.pubDate) : new Date();
-
-          newEntries.push({
-            title: item.title ?? 'Untitled',
-            link: item.link ?? '#',
-            pubDate: pubDate,
-            feedTitle: feed.title ?? 'Unknown Blog'
-          });
-
-          // Mark this entry as seen
-          lastCheckData.seenEntries[entryId] = now.getTime();
-        }
+    // Check for new entries since last check
+    for (const item of feed.items) {
+      const entryId = item.guid ?? item.link ?? item.title;
+      if (!entryId) {
+        continue;
       }
-    } catch (error) {
-      console.error(`Error processing feed ${feedUrl}:`, error);
+
+      const pubDate = item.pubDate == null ? now : new Date(item.pubDate);
+      // If this is a new entry we haven't seen before and it was published after our last check
+      if (!lastCheckData.seenEntryIds.includes(entryId) && pubDate > new Date(lastCheckData.lastCheckEpochMillis)) {
+        newEntries.push({
+          title: item.title ?? '(Untitled)',
+          link: item.link ?? '#',
+          pubDate,
+          feedTitle: feed.title ?? '(Unknown)'
+        });
+
+        // Mark this entry as seen
+        lastCheckData.seenEntryIds.push(entryId);
+      }
     }
   }
 
   // Update the last check time
-  lastCheckData.lastCheck = now.getTime();
+  lastCheckData.lastCheckEpochMillis = now.getDate();
 
-  // Save the updated check data
-  try {
-    await env.RSS_TO_EMAIL.put(STORAGE_KEY, JSON.stringify(lastCheckData));
-  } catch (error) {
-    console.error('Error saving check data:', error);
-  }
 
   // If we found new entries, send an email
   if (newEntries.length > 0) {
@@ -138,6 +117,9 @@ async function checkRSSFeeds(env: Env): Promise<void> {
   } else {
     console.log('No new blog entries found');
   }
+
+  // Save the updated check data
+  await env.RSS_TO_EMAIL.put(STORAGE_KEY, JSON.stringify(lastCheckData));
 }
 
 // Helper function to format dates in a readable format
@@ -174,42 +156,37 @@ async function sendEmail(env: Env, entries: BlogEntry[]): Promise<void> {
 </ul>
 <p>Enjoy your reading!</p>`;
 
-  try {
-    // Create SES client
-    const sesClient = new SESClient({
-      region: 'us-east-1',
-      credentials: {
-        accessKeyId: env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
-      },
-    });
+  // Create SES client
+  const sesClient = new SESClient({
+    region: 'us-east-1',
+    credentials: {
+      accessKeyId: env.AWS_ACCESS_KEY_ID,
+      secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+    },
+  });
 
-    // Create the email parameters
-    const params: SendEmailCommandInput = {
-      Source: env.EMAIL_ADDRESS,
-      Destination: {
-        ToAddresses: [env.EMAIL_ADDRESS],
+  // Create the email parameters
+  const params: SendEmailCommandInput = {
+    Source: env.EMAIL_ADDRESS,
+    Destination: {
+      ToAddresses: [env.EMAIL_ADDRESS],
+    },
+    Message: {
+      Subject: {
+        Data: 'Daily Blog Updates',
+        Charset: 'UTF-8',
       },
-      Message: {
-        Subject: {
-          Data: 'Daily Blog Updates',
+      Body: {
+        Html: {
+          Data: emailBody,
           Charset: 'UTF-8',
         },
-        Body: {
-          Html: {
-            Data: emailBody,
-            Charset: 'UTF-8',
-          },
-        },
       },
-    };
+    },
+  };
 
-    // Send the email
-    const command = new SendEmailCommand(params);
-    const response = await sesClient.send(command);
-
-    console.log('Email sent successfully:', response.MessageId);
-  } catch (error) {
-    console.error('Error sending email with AWS SES:', error);
-  }
+  // Send the email
+  const command = new SendEmailCommand(params);
+  const response = await sesClient.send(command);
+  console.log('Email sent successfully:', response.MessageId);
 }
