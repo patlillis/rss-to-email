@@ -21,6 +21,7 @@ type BlogEntry = {
   link: string;
   feedTitle: string;
   pubDate: Date;
+  author: string;
 };
 
 type Env = {
@@ -33,17 +34,13 @@ type Env = {
 const STORAGE_KEY = 'last_check_data';
 
 export default {
-  // Handle HTTP requests
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    // Simple status endpoint
     if (url.pathname === '/status') {
       return new Response('RSS checker is running', { status: 200 });
     }
 
-    // Manual trigger endpoint (protected by a simple query param for demo purposes)
-    // In production, you should use proper authentication
     if (url.pathname === '/check' && url.searchParams.get('key') === 'manual-trigger-key') {
       try {
         await checkRSSFeeds(env);
@@ -57,7 +54,6 @@ export default {
     return new Response('Hello from RSS Checker Worker!', { status: 200 });
   },
 
-  // Handle scheduled events
   async scheduled(event: ScheduledEvent, env: Env): Promise<void> {
     console.log('Daily RSS check triggered at:', new Date(event.scheduledTime).toISOString());
     try {
@@ -91,7 +87,6 @@ async function checkRSSFeeds(env: Env): Promise<void> {
       const feedContents = await fetchFeedResult.text();
       const feed = await parser.parseString(feedContents);
 
-      // Check for new entries since last check
       for (const item of feed.items) {
         const entryId = item.guid ?? item.link ?? item.title;
         if (!entryId) {
@@ -99,16 +94,16 @@ async function checkRSSFeeds(env: Env): Promise<void> {
         }
 
         const pubDate = item.pubDate == null ? now : new Date(item.pubDate);
-        // If this is a new entry we haven't seen before and it was published after our last check
         if (!lastCheckData.seenEntryIds.includes(entryId) && pubDate > new Date(lastCheckData.lastCheckEpochMillis)) {
-          newEntries.push({
+          const newEntry: BlogEntry = {
             title: item.title ?? '(Untitled)',
             link: item.link ?? '#',
             pubDate,
-            feedTitle: feed.title ?? '(Unknown)'
-          });
+            feedTitle: feed.title ?? '(Unknown)',
+            author: item.creator ?? item.author ?? '(Unknown)'
+          };
 
-          // Mark this entry as seen
+          newEntries.push(newEntry);
           lastCheckData.seenEntryIds.push(entryId);
         }
       }
@@ -119,19 +114,21 @@ async function checkRSSFeeds(env: Env): Promise<void> {
     }
   }
 
-  // Update the last check time
-  lastCheckData.lastCheckEpochMillis = now.valueOf();
-
-  // If we found new entries, send an email
   if (newEntries.length > 0) {
-    console.log(`Found ${newEntries.length} new entries to send`)
-    await sendEmail(env, newEntries);
+    const ses = new SESClient({
+      region: 'us-east-1',
+      credentials: {
+        accessKeyId: env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
+      },
+    });
+    await Promise.all(newEntries.map(entry => sendEmail(env, entry, ses)));
   } else {
     console.log('No new blog entries found');
   }
 
-  // Save the updated check data
   try {
+    lastCheckData.lastCheckEpochMillis = now.valueOf();
     await env.RSS_TO_EMAIL.put(STORAGE_KEY, JSON.stringify(lastCheckData));
   }
   catch (err) {
@@ -140,59 +137,26 @@ async function checkRSSFeeds(env: Env): Promise<void> {
   }
 }
 
-// Helper function to format dates in a readable format
-function formatDate(date: Date): string {
-  const options: Intl.DateTimeFormatOptions = {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  };
-  return date.toLocaleDateString('en-US', options);
-}
 
-async function sendEmail(env: Env, entries: BlogEntry[]): Promise<void> {
+async function sendEmail(env: Env, entry: BlogEntry, ses: SESClient): Promise<void> {
   try {
-    // Format the email content
-    let emailBody = `<h1>New Blog Posts</h1>
-<p>Found ${entries.length} new blog post${entries.length > 1 ? 's' : ''}:</p>
-<ul>`;
+    const emailBody = `<h1>New Post from "${entry.feedTitle}"</h1>
+<div style="margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px;">
+  <h2><a href="${entry.link}">${entry.title}</a></h2>
+  <p>By: ${entry.author}</p>
+  <p style="color: #666;">Published on: ${formatDate(entry.pubDate)}</p>
+</div>`;
 
-    // Sort entries by publication date (newest first)
-    const sortedEntries = [...entries].sort((a, b) =>
-      b.pubDate.valueOf() - a.pubDate.valueOf()
-    );
-
-    for (const entry of sortedEntries) {
-      emailBody += `
-  <li>
-    <strong>${entry.feedTitle}</strong>: 
-    <a href="${entry.link}">${entry.title}</a> 
-    <span style="color: #666; font-size: 0.9em;">(${formatDate(entry.pubDate)})</span>
-  </li>`;
-    }
-
-    emailBody += `
-</ul>
-<p>Enjoy your reading!</p>`;
-
-    // Create SES client
-    const sesClient = new SESClient({
-      region: 'us-east-1',
-      credentials: {
-        accessKeyId: env.AWS_ACCESS_KEY_ID,
-        secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
-      },
-    });
 
     // Create the email parameters
     const params: SendEmailCommandInput = {
-      Source: env.EMAIL_ADDRESS,
+      Source: `${entry.author} <${env.EMAIL_ADDRESS}>`,
       Destination: {
         ToAddresses: [env.EMAIL_ADDRESS],
       },
       Message: {
         Subject: {
-          Data: 'Daily Blog Updates',
+          Data: entry.title,
           Charset: 'UTF-8',
         },
         Body: {
@@ -206,11 +170,20 @@ async function sendEmail(env: Env, entries: BlogEntry[]): Promise<void> {
 
     // Send the email
     const command = new SendEmailCommand(params);
-    const response = await sesClient.send(command);
-    console.log('Email sent successfully:', response.MessageId);
+    const response = await ses.send(command);
+    console.log(`Email sent for "${entry.title}"`, { messageId: response.MessageId });
   }
   catch (err) {
-    console.error("Error sending email", err);
+    console.error(`Error sending email for "${entry.title}"`, err);
     throw err;
   }
+}
+
+function formatDate(date: Date): string {
+  const options: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric'
+  };
+  return date.toLocaleDateString('en-US', options);
 }
