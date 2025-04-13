@@ -14,6 +14,8 @@ const lastCheckDataSchema = z.object({
   seenEntryIds: z.array(z.string()),
 });
 
+type LastCheckData = z.infer<typeof lastCheckDataSchema>;
+
 type BlogEntry = {
   title: string;
   link: string;
@@ -68,47 +70,57 @@ export default {
 };
 
 async function checkRSSFeeds(env: Env): Promise<void> {
-  const parser = new Parser();
-
-  const storedData = await env.RSS_TO_EMAIL.get(STORAGE_KEY, { type: 'json' });
-  const lastCheckData = lastCheckDataSchema.parse(storedData);
+  let lastCheckData: LastCheckData;
+  try {
+    const storedData = await env.RSS_TO_EMAIL.get(STORAGE_KEY, { type: 'json' });
+    lastCheckData = lastCheckDataSchema.parse(storedData);
+  }
+  catch (err) {
+    console.error("Error loading lastCheckData", err);
+    throw err;
+  }
 
   const now = new Date();
   const newEntries: BlogEntry[] = [];
-
+  const parser = new Parser();
   for (const feedUrl of feedUrls) {
-    console.log(`Checking feed: ${feedUrl}`);
+    try {
+      console.log(`Checking feed: ${feedUrl}`);
 
-    const fetchFeedResult = await fetch(feedUrl);
-    const feedContents = await fetchFeedResult.text();
-    const feed = await parser.parseString(feedContents);
+      const fetchFeedResult = await fetch(feedUrl);
+      const feedContents = await fetchFeedResult.text();
+      const feed = await parser.parseString(feedContents);
 
-    // Check for new entries since last check
-    for (const item of feed.items) {
-      const entryId = item.guid ?? item.link ?? item.title;
-      if (!entryId) {
-        continue;
+      // Check for new entries since last check
+      for (const item of feed.items) {
+        const entryId = item.guid ?? item.link ?? item.title;
+        if (!entryId) {
+          continue;
+        }
+
+        const pubDate = item.pubDate == null ? now : new Date(item.pubDate);
+        // If this is a new entry we haven't seen before and it was published after our last check
+        if (!lastCheckData.seenEntryIds.includes(entryId) && pubDate > new Date(lastCheckData.lastCheckEpochMillis)) {
+          newEntries.push({
+            title: item.title ?? '(Untitled)',
+            link: item.link ?? '#',
+            pubDate,
+            feedTitle: feed.title ?? '(Unknown)'
+          });
+
+          // Mark this entry as seen
+          lastCheckData.seenEntryIds.push(entryId);
+        }
       }
-
-      const pubDate = item.pubDate == null ? now : new Date(item.pubDate);
-      // If this is a new entry we haven't seen before and it was published after our last check
-      if (!lastCheckData.seenEntryIds.includes(entryId) && pubDate > new Date(lastCheckData.lastCheckEpochMillis)) {
-        newEntries.push({
-          title: item.title ?? '(Untitled)',
-          link: item.link ?? '#',
-          pubDate,
-          feedTitle: feed.title ?? '(Unknown)'
-        });
-
-        // Mark this entry as seen
-        lastCheckData.seenEntryIds.push(entryId);
-      }
+    }
+    catch (err) {
+      console.error(`Error checking feed ${feedUrl}`, err);
+      throw err;
     }
   }
 
   // Update the last check time
   lastCheckData.lastCheckEpochMillis = now.getDate();
-
 
   // If we found new entries, send an email
   if (newEntries.length > 0) {
@@ -119,7 +131,13 @@ async function checkRSSFeeds(env: Env): Promise<void> {
   }
 
   // Save the updated check data
-  await env.RSS_TO_EMAIL.put(STORAGE_KEY, JSON.stringify(lastCheckData));
+  try {
+    await env.RSS_TO_EMAIL.put(STORAGE_KEY, JSON.stringify(lastCheckData));
+  }
+  catch (err) {
+    console.error("Error saving lastCheckData", err);
+    throw err;
+  }
 }
 
 // Helper function to format dates in a readable format
@@ -133,60 +151,66 @@ function formatDate(date: Date): string {
 }
 
 async function sendEmail(env: Env, entries: BlogEntry[]): Promise<void> {
-  // Format the email content
-  let emailBody = `<h1>New Blog Posts</h1>
+  try {
+    // Format the email content
+    let emailBody = `<h1>New Blog Posts</h1>
 <p>Found ${entries.length} new blog post${entries.length > 1 ? 's' : ''}:</p>
 <ul>`;
 
-  // Sort entries by publication date (newest first)
-  const sortedEntries = [...entries].sort((a, b) =>
-    b.pubDate.getTime() - a.pubDate.getTime()
-  );
+    // Sort entries by publication date (newest first)
+    const sortedEntries = [...entries].sort((a, b) =>
+      b.pubDate.getTime() - a.pubDate.getTime()
+    );
 
-  for (const entry of sortedEntries) {
-    emailBody += `
+    for (const entry of sortedEntries) {
+      emailBody += `
   <li>
     <strong>${entry.feedTitle}</strong>: 
     <a href="${entry.link}">${entry.title}</a> 
     <span style="color: #666; font-size: 0.9em;">(${formatDate(entry.pubDate)})</span>
   </li>`;
-  }
+    }
 
-  emailBody += `
+    emailBody += `
 </ul>
 <p>Enjoy your reading!</p>`;
 
-  // Create SES client
-  const sesClient = new SESClient({
-    region: 'us-east-1',
-    credentials: {
-      accessKeyId: env.AWS_ACCESS_KEY_ID,
-      secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
-    },
-  });
-
-  // Create the email parameters
-  const params: SendEmailCommandInput = {
-    Source: env.EMAIL_ADDRESS,
-    Destination: {
-      ToAddresses: [env.EMAIL_ADDRESS],
-    },
-    Message: {
-      Subject: {
-        Data: 'Daily Blog Updates',
-        Charset: 'UTF-8',
+    // Create SES client
+    const sesClient = new SESClient({
+      region: 'us-east-1',
+      credentials: {
+        accessKeyId: env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: env.AWS_SECRET_ACCESS_KEY,
       },
-      Body: {
-        Html: {
-          Data: emailBody,
+    });
+
+    // Create the email parameters
+    const params: SendEmailCommandInput = {
+      Source: env.EMAIL_ADDRESS,
+      Destination: {
+        ToAddresses: [env.EMAIL_ADDRESS],
+      },
+      Message: {
+        Subject: {
+          Data: 'Daily Blog Updates',
           Charset: 'UTF-8',
         },
+        Body: {
+          Html: {
+            Data: emailBody,
+            Charset: 'UTF-8',
+          },
+        },
       },
-    },
-  };
+    };
 
-  // Send the email
-  const command = new SendEmailCommand(params);
-  const response = await sesClient.send(command);
-  console.log('Email sent successfully:', response.MessageId);
+    // Send the email
+    const command = new SendEmailCommand(params);
+    const response = await sesClient.send(command);
+    console.log('Email sent successfully:', response.MessageId);
+  }
+  catch (err) {
+    console.error("Error sending email", err);
+    throw err;
+  }
 }
