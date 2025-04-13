@@ -1,3 +1,3 @@
 export const feeds = [
-  "https://css-tricks.com/feed/",
+  "https://www.robinsloan.com/lab.xml",
 ];
