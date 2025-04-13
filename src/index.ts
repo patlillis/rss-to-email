@@ -120,7 +120,7 @@ async function checkRSSFeeds(env: Env): Promise<void> {
   }
 
   // Update the last check time
-  lastCheckData.lastCheckEpochMillis = now.getDate();
+  lastCheckData.lastCheckEpochMillis = now.valueOf();
 
   // If we found new entries, send an email
   if (newEntries.length > 0) {
@@ -159,7 +159,7 @@ async function sendEmail(env: Env, entries: BlogEntry[]): Promise<void> {
 
     // Sort entries by publication date (newest first)
     const sortedEntries = [...entries].sort((a, b) =>
-      b.pubDate.getTime() - a.pubDate.getTime()
+      b.pubDate.valueOf() - a.pubDate.valueOf()
     );
 
     for (const entry of sortedEntries) {
