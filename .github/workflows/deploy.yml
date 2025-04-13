@@ -26,7 +26,11 @@ jobs:
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          secrets: |
+            AWS_ACCESS_KEY_ID
+            AWS_SECRET_ACCESS_KEY
+            EMAIL_ADDRESS
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          EMAIL_ADDRESS: ${{ vars.EMAIL_ADDRESS }}
+          EMAIL_ADDRESS: ${{ secrets.EMAIL_ADDRESS }}

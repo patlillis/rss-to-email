@@ -4,9 +4,6 @@ compatibility_flags = [ "nodejs_compat" ]
 compatibility_date = "2024-09-23"
 triggers = { crons = ["0 8 * * *"] } # Run once a day at 8:00 AM UTC
 
-[vars]
-EMAIL_ADDRESS = "lillispm@gmail.com"
-
 [observability]
 enabled = true
 
