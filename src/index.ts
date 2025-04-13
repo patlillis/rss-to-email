@@ -17,11 +17,12 @@ const lastCheckDataSchema = z.object({
 type LastCheckData = z.infer<typeof lastCheckDataSchema>;
 
 type BlogEntry = {
-  title: string;
-  link: string;
-  feedTitle: string;
   pubDate: Date;
-  author: string;
+  feedTitle?: string;
+  title?: string;
+  link?: string;
+  summary?: string;
+  author?: string;
 };
 
 type Env = {
@@ -76,9 +77,24 @@ async function checkRSSFeeds(env: Env): Promise<void> {
     throw err;
   }
 
+
+  type CustomFeed = {
+    author?: {
+      name?: string;
+    }
+  };
+  type CustomItem = {
+    summary?: string;
+  }
+
   const now = new Date();
   const newEntries: BlogEntry[] = [];
-  const parser = new Parser();
+  const parser = new Parser<CustomFeed, CustomItem>({
+    customFields: {
+      feed: ['author'],
+      item: ['summary']
+    }
+  });
   for (const feedUrl of feedUrls) {
     try {
       console.log(`Checking feed: ${feedUrl}`);
@@ -96,11 +112,12 @@ async function checkRSSFeeds(env: Env): Promise<void> {
         const pubDate = item.pubDate == null ? now : new Date(item.pubDate);
         if (!lastCheckData.seenEntryIds.includes(entryId) && pubDate > new Date(lastCheckData.lastCheckEpochMillis)) {
           const newEntry: BlogEntry = {
-            title: item.title ?? '(Untitled)',
-            link: item.link ?? '#',
+            title: item.title,
+            link: item.link,
             pubDate,
-            feedTitle: feed.title ?? '(Unknown)',
-            author: item.creator ?? item.author ?? '(Unknown)'
+            summary: item.summary,
+            feedTitle: feed.title ?? feedUrl,
+            author: item.creator ?? feed.author?.name
           };
 
           newEntries.push(newEntry);
@@ -137,16 +154,19 @@ async function checkRSSFeeds(env: Env): Promise<void> {
   }
 }
 
-
 async function sendEmail(env: Env, entry: BlogEntry, ses: SESClient): Promise<void> {
   try {
-    const emailBody = `<h1>New Post from "${entry.feedTitle}"</h1>
+    const feedTitle = entry.feedTitle ?? "(Unknown)";
+    const link = entry.link ?? "#";
+    const title = entry.title ?? "(Untitled)";
+
+    const emailBody = `<h1>New Post from "${feedTitle}"</h1>
 <div style="margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px;">
-  <h2><a href="${entry.link}">${entry.title}</a></h2>
-  <p>By: ${entry.author}</p>
+  <h2><a href="${link}">${title}</a></h2>
+  ${entry.author ? `<p>By: ${entry.author}</p>` : ''}
+  ${entry.summary ?? ''}
   <p style="color: #666;">Published on: ${formatDate(entry.pubDate)}</p>
 </div>`;
-
 
     // Create the email parameters
     const params: SendEmailCommandInput = {
