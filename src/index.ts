@@ -27,7 +27,8 @@ type BlogEntry = {
 
 type Env = {
   RSS_TO_EMAIL: KVNamespace;
-  EMAIL_ADDRESS: string;
+  FROM_EMAIL_ADDRESS: string;
+  TO_EMAIL_ADDRESS: string;
   AWS_ACCESS_KEY_ID: string;
   AWS_SECRET_ACCESS_KEY: string;
 };
@@ -170,9 +171,9 @@ async function sendEmail(env: Env, entry: BlogEntry, ses: SESClient): Promise<vo
 
     // Create the email parameters
     const params: SendEmailCommandInput = {
-      Source: `${entry.author} <${env.EMAIL_ADDRESS}>`,
+      Source: `${entry.author} <${env.FROM_EMAIL_ADDRESS}>`,
       Destination: {
-        ToAddresses: [env.EMAIL_ADDRESS],
+        ToAddresses: [`Pat Slick <${env.TO_EMAIL_ADDRESS}>`],
       },
       Message: {
         Subject: {
