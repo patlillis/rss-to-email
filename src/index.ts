@@ -79,6 +79,12 @@ async function checkRSSFeeds(env: Env): Promise<void> {
   }
 
 
+  const lastCheckDate = new Date(lastCheckData.lastCheckEpochMillis);
+  const now = new Date();
+  const newEntries: BlogEntry[] = [];
+
+  console.log("Checking RSS feeds", { lastCheckDate: lastCheckDate.toISOString() });
+
   type CustomFeed = {
     author?: {
       name?: string;
@@ -87,15 +93,13 @@ async function checkRSSFeeds(env: Env): Promise<void> {
   type CustomItem = {
     summary?: string;
   }
-
-  const now = new Date();
-  const newEntries: BlogEntry[] = [];
   const parser = new Parser<CustomFeed, CustomItem>({
     customFields: {
       feed: ['author'],
       item: ['summary']
     }
   });
+
   for (const feedUrl of feedUrls) {
     try {
       console.log(`Checking feed: ${feedUrl}`);
@@ -111,7 +115,7 @@ async function checkRSSFeeds(env: Env): Promise<void> {
         }
 
         const pubDate = item.pubDate == null ? now : new Date(item.pubDate);
-        if (!lastCheckData.seenEntryIds.includes(entryId) && pubDate > new Date(lastCheckData.lastCheckEpochMillis)) {
+        if (!lastCheckData.seenEntryIds.includes(entryId) && pubDate > lastCheckDate) {
           const newEntry: BlogEntry = {
             title: item.title,
             link: item.link,
