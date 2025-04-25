@@ -68,6 +68,8 @@ export default {
 };
 
 async function checkRSSFeeds(env: Env): Promise<void> {
+  console.log("Checking RSS feeds");
+
   let lastCheckData: LastCheckData;
   try {
     const storedData = await env.RSS_TO_EMAIL.get(STORAGE_KEY, { type: 'json' });
@@ -78,13 +80,11 @@ async function checkRSSFeeds(env: Env): Promise<void> {
     throw err;
   }
 
+  console.log("Loaded lastCheckData", { lastCheckData });
 
   const lastCheckDate = new Date(lastCheckData.lastCheckEpochMillis);
   const now = new Date();
   const newEntries: BlogEntry[] = [];
-
-  console.log("Checking RSS feeds", { lastCheckDate: lastCheckDate.toISOString() });
-
   type CustomFeed = {
     author?: {
       name?: string;
@@ -151,6 +151,7 @@ async function checkRSSFeeds(env: Env): Promise<void> {
 
   try {
     lastCheckData.lastCheckEpochMillis = now.valueOf();
+    console.log("Updating lastCheckData", { lastCheckData });
     await env.RSS_TO_EMAIL.put(STORAGE_KEY, JSON.stringify(lastCheckData));
   }
   catch (err) {
