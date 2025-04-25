@@ -101,9 +101,10 @@ async function checkRSSFeeds(env: Env): Promise<void> {
   });
 
   for (const feedUrl of feedUrls) {
-    try {
-      console.log(`Checking feed: ${feedUrl}`);
+    console.group(feedUrl)
+    console.log(`Checking feed: ${feedUrl}`);
 
+    try {
       const fetchFeedResult = await fetch(feedUrl);
       const feedContents = await fetchFeedResult.text();
       const feed = await parser.parseString(feedContents);
@@ -115,7 +116,11 @@ async function checkRSSFeeds(env: Env): Promise<void> {
         }
 
         const pubDate = item.pubDate == null ? now : new Date(item.pubDate);
-        if (!lastCheckData.seenEntryIds.includes(entryId) && pubDate > lastCheckDate) {
+        const alreadySeen = lastCheckData.seenEntryIds.includes(entryId);
+        const isNew = pubDate > lastCheckDate;
+        console.log(`Found entry ${entryId}`, { pubDate, alreadySeen, isNew });
+
+        if (!alreadySeen && isNew) {
           const newEntry: BlogEntry = {
             title: item.title,
             link: item.link,
@@ -133,6 +138,9 @@ async function checkRSSFeeds(env: Env): Promise<void> {
     catch (err) {
       console.error(`Error checking feed ${feedUrl}`, err);
       throw err;
+    }
+    finally {
+      console.groupEnd()
     }
   }
 
